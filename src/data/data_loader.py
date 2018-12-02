@@ -12,16 +12,20 @@ class loader(object):
     te_id = [[ 1,  6, 10,  7,  5,],
              [ 8,  0,  8, 11, 10,]]
 
-    def __init__(self, shuffle, bin_size, batch_size, split):
+    def __init__(self, shuffle, bin_size, batch_size, split, mu=None, sigma=None):
         """
             Args:
                 shuffle (bool):
                 bin_size (int):
                 batch_size (int):
                 split (str): either 'tr', 'va' or 'te'
+                mu (2-tuple(floats)): (mu_x, mu_y) from the train split.
+                sigma (2-tuple(floats)): (sigma_x, sigma_y) from the train split.
         """
         self.shuffle = shuffle
         self.batch_size = batch_size
+        self.mu = mu
+        self.sigma = sigma
 
         if split == 'tr':
             data_id = self.tr_id
@@ -36,9 +40,9 @@ class loader(object):
         self.x = []
         self.y = []
         for i in range(len(data_id[0])):
+            # _x : (len(xs)/max_bin_size, max_bin_size)
+            # _y : (len(xs)/max_bin_size,)
             _x, _y = bin_single_router_pair(traffic_mats, (data_id[0][i], data_id[1][i]))
-            # _x = (len(xs)/max_bin_size, max_bin_size)
-            # _y = (len(xs)/max_bin_size,)
             self.x.append(_x)
             self.y.append(_y)
         self.x = np.vstack(self.x)
@@ -46,12 +50,22 @@ class loader(object):
 
         self.x = self.x[:, -bin_size:]
 
+        # Only use mu, and sigma from the training set for the
+        # validation or test set normalizations.
+        if self.mu is None:
+            self.mu = (np.mean(self.x), np.mean(self.y))
+            self.sigma = (np.std(self.x), np.std(self.y))
+
+        # Z-score X, and y to have mean 0, unit variance
+        self.x = (self.x - self.mu[0]) / (self.sigma[0])
+        self.y = (self.y - self.mu[1]) / (self.sigma[1])
+
         self.num_batches = self.x.shape[0] // self.batch_size
         self.num_samples = self.num_batches * self.batch_size
         self.step = 0
 
         if self.x.shape[0] % batch_size != 0:
-            print("Warning: There are {} extra samples. \
+            print("Warning: There are {} extra samples.\n\
             Take care for test and validation sets".format(
                 self.x.shape[0] % batch_size))
 
@@ -72,4 +86,5 @@ class loader(object):
 
 if __name__ == "__main__":
     train_loader = loader(True, 20, 128, 'tr')
+    test_loader = loader(True, 20, 128, 'te', train_loader.mu, train_loader.sigma)
     print(train_loader.load()[0].shape)
