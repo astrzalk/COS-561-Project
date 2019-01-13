@@ -5,9 +5,10 @@ import numpy as np
 from numpy.random import gamma as Gamma
 from numpy.random import normal as Normal
 
-def bin_single_router_pair(traffic_mat, router_pair, which_transform=1, max_bin_size=100, seed=561):
+def bin_single_router_pair(traffic_mat, router_pair, which_transform=1, max_bin_size=100):
     i, j = router_pair
     xs = traffic_mat[:, i, j]
+    seed = router_pair[0]*router_pair[1] + 12
     np.random.seed(seed)
     ys = flow_transform(xs, which_transform)
     num_pts = len(xs)
@@ -42,12 +43,13 @@ if __name__ == "__main__":
     data_path = "../data/traffic_mats.npy"
     traffic_mats = np.load(data_path)[0:48000, :, :]
     router_pair = (3, 4)
-    list_of_ys = []
-    for _ in range(10):
-        ys, xs = bin_single_router_pair(traffic_mats, router_pair)
-        list_of_ys.append(ys)
+    second_router_pair = (8, 1)
+    first_router_ys = [bin_single_router_pair(traffic_mats, router_pair)[0] for _ in range(10)]
+    second_router_ys = [bin_single_router_pair(traffic_mats, second_router_pair)[0] for _ in range(10)]
     # Make sure random seed works
-    assert(np.linalg.norm(list_of_ys[0] - list_of_ys[7]) == 0)
-    assert(ys.shape == (480, 100))
-    assert(xs.shape == (480,))
+    assert(np.linalg.norm(first_router_ys[0] - first_router_ys[7]) == 0)
+    assert(np.linalg.norm(second_router_ys[2] - second_router_ys[3]) == 0)
+
+    # assert(ys.shape == (480, 100))
+    # assert(xs.shape == (480,))
 
